@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aroma Cafetería POS</title>
+<style>
+body{font-family:Arial;background:#f4f4f4;margin:0;padding:10px}
+.hidden{display:none}
+button{padding:10px;margin:5px;font-size:16px}
+.card{background:white;padding:15px;border-radius:8px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+header{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+  <h2>☕ Aroma Cafetería</h2>
+  <input id="user" placeholder="Usuario"><br><br>
+  <input id="pass" type="password" placeholder="Contraseña"><br><br>
+  <button onclick="login()">Entrar</button>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <h2>☕ Aroma Cafetería</h2>
+  <div>
+    <span id="hora"></span><br>
+    <button onclick="logout()">Cerrar sesión</button>
+  </div>
+</header>
+
+<div class="card">
+<h3>Extras</h3>
+<button onclick="toggleExtra('Jarabe',10)">Jarabe +$10</button>
+<button onclick="toggleExtra('Leche especial',10)">Leche especial +$10</button>
+<button onclick="toggleExtra('Shot extra',15)">Shot extra +$15</button>
+</div>
+
+<div class="card">
+<h3>Menú</h3>
+<div class="grid" id="menu"></div>
+</div>
+
+<div class="card">
+<h3>Venta actual</h3>
+<ul id="carrito"></ul>
+<p><strong>Total: $<span id="total">0</span> MXN</strong></p>
+<select id="pago">
+<option>Efectivo</option>
+<option>Transferencia</option>
+<option>Tarjeta</option>
+</select><br><br>
+<button onclick="cobrar()">Cobrar</button>
+</div>
+
+<div id="admin" class="card hidden">
+<h3>📊 Corte Diario</h3>
+<p>Total del día: $<span id="corte">0</span></p>
+<p>Ventas: <span id="numVentas">0</span></p>
+<button onclick="exportar()">Exportar CSV</button>
+</div>
+</div>
+
+<script>
+const usuarios={admin:"aroma123",empleado:"empleado"};
+let rol="";
+let extras=[];
+let carrito=[];
+let ventas=[];
+const productos=[
+{name:"Latte",precio:70,stock:50},
+{name:"Latte en las rocas",precio:80,stock:40},
+{name:"Capuchino",precio:70,stock:50},
+{name:"Moka",precio:75,stock:40},
+{name:"Caramel Macchiato",precio:85,stock:30},
+{name:"Café regular",precio:55,stock:80},
+{name:"Café especialidad",precio:65,stock:60},
+{name:"Pan dulce",precio:28,stock:100}
+];
+
+function login(){
+const u=user.value,p=pass.value;
+if(usuarios[u]===p){
+rol=u;
+loginDiv.classList.add("hidden");
+app.classList.remove("hidden");
+if(u==="admin")admin.classList.remove("hidden");
+renderMenu();
+}else alert("Datos incorrectos");
+}
+
+function logout(){location.reload()}
+
+function toggleExtra(n,p){
+extras.push({n,p});
+}
+
+function renderMenu(){
+menu.innerHTML="";
+productos.forEach((p,i)=>{
+const b=document.createElement("button");
+b.textContent=`${p.name} $${p.precio} (Stock ${p.stock})`;
+b.onclick=()=>add(i);
+b.disabled=p.stock<=0;
+menu.appendChild(b);
+});
+}
+
+function add(i){
+productos[i].stock--;
+carrito.push({name:productos[i].name,precio:productos[i].precio,extras:[...extras]});
+extras=[];
+render();
+}
+
+function render(){
+carritoDiv.innerHTML="";
+let t=0;
+carrito.forEach(c=>{
+let e=c.extras.reduce((a,x)=>a+x.p,0);
+t+=c.precio+e;
+const li=document.createElement("li");
+li.textContent=c.name+(c.extras.length?` (+${c.extras.map(x=>x.n).join(", ")})`:"");
+carritoDiv.appendChild(li);
+});
+total.textContent=t;
+renderMenu();
+}
+
+function cobrar(){
+ventas.push(total.textContent);
+corte.textContent=ventas.reduce((a,v)=>a+Number(v),0);
+numVentas.textContent=ventas.length;
+carrito=[];
+render();
+}
+
+function exportar(){
+let csv="Total\n"+ventas.join("\n");
+const a=document.createElement("a");
+a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+a.download="corte.csv";
+a.click();
+}
+
+setInterval(()=>hora.textContent=new Date().toLocaleString(),1000);
+
+const loginDiv=document.getElementById("login");
+const app=document.getElementById("app");
+const admin=document.getElementById("admin");
+const menu=document.getElementById("menu");
+const carritoDiv=document.getElementById("carrito");
+</script>
+
+</body>
+</html>
