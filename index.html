@@ -3,40 +3,92 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aroma Cafetería POS</title>
+<title>Café Dos Raíces POS 3.0</title>
+
 <style>
-body{font-family:Arial;background:#f4f4f4;margin:0;padding:10px}
+:root{
+--verde:#3e4a3f;
+--crema:#f4efe6;
+--beige:#d8cfc4;
+--rojo:#b04a4a;
+}
+
+body{
+font-family:Arial;
+background:var(--verde);
+color:var(--crema);
+margin:0;
+padding:15px;
+}
+
+.card{
+background:#2f3831;
+padding:15px;
+border-radius:10px;
+margin-bottom:15px;
+}
+
+button{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:6px;
+background:var(--beige);
+cursor:pointer;
+}
+
+button:hover{opacity:.8}
+
+input,select{
+padding:8px;
+margin:5px 0;
+width:95%;
+}
+
+.stock-bajo{
+background:var(--rojo);
+color:white;
+}
+
 .hidden{display:none}
-button{padding:10px;margin:5px;font-size:16px}
-.card{background:white;padding:15px;border-radius:8px;margin-bottom:10px}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-header{display:flex;justify-content:space-between;align-items:center}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+gap:10px;
+}
+
+header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+@media print{
+body *{visibility:hidden}
+#ticket,#ticket *{visibility:visible}
+#ticket{position:absolute;left:0;top:0}
+}
 </style>
 </head>
 <body>
 
 <div id="login" class="card">
-  <h2>☕ Aroma Cafetería</h2>
-  <input id="user" placeholder="Usuario"><br><br>
-  <input id="pass" type="password" placeholder="Contraseña"><br><br>
-  <button onclick="login()">Entrar</button>
+<h2>☕ Café Dos Raíces</h2>
+<input id="user" placeholder="Usuario">
+<input id="pass" type="password" placeholder="Contraseña">
+<button onclick="login()">Entrar</button>
 </div>
 
 <div id="app" class="hidden">
-<header>
-  <h2>☕ Aroma Cafetería</h2>
-  <div>
-    <span id="hora"></span><br>
-    <button onclick="logout()">Cerrar sesión</button>
-  </div>
-</header>
 
-<div class="card">
-<h3>Extras</h3>
-<button onclick="toggleExtra('Jarabe',10)">Jarabe +$10</button>
-<button onclick="toggleExtra('Leche especial',10)">Leche especial +$10</button>
-<button onclick="toggleExtra('Shot extra',15)">Shot extra +$15</button>
+<header>
+<h2>☕ Café Dos Raíces</h2>
+<div>
+<span id="hora"></span><br>
+<button onclick="logout()">Cerrar sesión</button>
 </div>
+</header>
 
 <div class="card">
 <h3>Menú</h3>
@@ -46,112 +98,200 @@ header{display:flex;justify-content:space-between;align-items:center}
 <div class="card">
 <h3>Venta actual</h3>
 <ul id="carrito"></ul>
-<p><strong>Total: $<span id="total">0</span> MXN</strong></p>
+<p><strong>Total: $<span id="total">0</span></strong></p>
+
 <select id="pago">
 <option>Efectivo</option>
 <option>Transferencia</option>
 <option>Tarjeta</option>
-</select><br><br>
+</select>
+
 <button onclick="cobrar()">Cobrar</button>
 </div>
 
-<div id="admin" class="card hidden">
-<h3>📊 Corte Diario</h3>
-<p>Total del día: $<span id="corte">0</span></p>
-<p>Ventas: <span id="numVentas">0</span></p>
-<button onclick="exportar()">Exportar CSV</button>
+<div id="adminPanel" class="card hidden">
+<h3>📊 Panel Admin</h3>
+
+<label>Filtrar por fecha:</label>
+<input type="date" id="fechaFiltro">
+<button onclick="filtrarFecha()">Ver corte</button>
+
+<p>Total día: $<span id="corteDia">0</span></p>
+<p>Efectivo: $<span id="corteE">0</span></p>
+<p>Transferencia: $<span id="corteT">0</span></p>
+<p>Tarjeta: $<span id="corteTar">0</span></p>
+
+<hr>
+
+<h4>Inventario</h4>
+<div id="inventario"></div>
+
+<hr>
+
+<button onclick="resetSistema()" style="background:var(--rojo);color:white">
+Reiniciar Sistema
+</button>
+
 </div>
 </div>
+
+<div id="ticket" class="hidden"></div>
 
 <script>
-const usuarios={admin:"aroma123",empleado:"empleado"};
-let rol="";
-let extras=[];
-let carrito=[];
-let ventas=[];
-const productos=[
-{name:"Latte",precio:70,stock:50},
-{name:"Latte en las rocas",precio:80,stock:40},
-{name:"Capuchino",precio:70,stock:50},
-{name:"Moka",precio:75,stock:40},
-{name:"Caramel Macchiato",precio:85,stock:30},
-{name:"Café regular",precio:55,stock:80},
-{name:"Café especialidad",precio:65,stock:60},
-{name:"Pan dulce",precio:28,stock:100}
+
+let usuarios = JSON.parse(localStorage.getItem("usuarios")) || {
+admin:"aroma123",
+empleado:"empleado",
+Paco:"2504"
+};
+
+let ventas = JSON.parse(localStorage.getItem("ventas")) || [];
+let productos = JSON.parse(localStorage.getItem("productos")) || [
+{name:"Latte",precio:70,stock:20},
+{name:"Capuchino",precio:70,stock:20},
+{name:"Moka",precio:75,stock:15},
+{name:"Caramel Macchiato",precio:85,stock:15},
+{name:"Café Especialidad",precio:65,stock:25},
+{name:"Pan Dulce",precio:28,stock:40}
 ];
 
-function login(){
-const u=user.value,p=pass.value;
-if(usuarios[u]===p){
-rol=u;
-loginDiv.classList.add("hidden");
-app.classList.remove("hidden");
-if(u==="admin")admin.classList.remove("hidden");
-renderMenu();
-}else alert("Datos incorrectos");
+let carrito=[];
+let rol="";
+let ticketNum = ventas.length+1;
+
+function guardar(){
+localStorage.setItem("usuarios",JSON.stringify(usuarios));
+localStorage.setItem("ventas",JSON.stringify(ventas));
+localStorage.setItem("productos",JSON.stringify(productos));
 }
 
-function logout(){location.reload()}
+function login(){
+if(usuarios[user.value]===pass.value){
+rol=user.value;
+login.classList.add("hidden");
+app.classList.remove("hidden");
+if(rol==="Paco") adminPanel.classList.remove("hidden");
+renderMenu();
+}
+else alert("Datos incorrectos");
+}
 
-function toggleExtra(n,p){
-extras.push({n,p});
+function logout(){
+location.reload();
 }
 
 function renderMenu(){
 menu.innerHTML="";
 productos.forEach((p,i)=>{
-const b=document.createElement("button");
-b.textContent=`${p.name} $${p.precio} (Stock ${p.stock})`;
-b.onclick=()=>add(i);
-b.disabled=p.stock<=0;
+let b=document.createElement("button");
+b.textContent=${p.name} $${p.precio} (Stock ${p.stock});
+if(p.stock<=5) b.classList.add("stock-bajo");
+b.onclick=()=>agregar(i);
 menu.appendChild(b);
 });
+renderInventario();
 }
 
-function add(i){
+function agregar(i){
+if(productos[i].stock<=0) return alert("Sin stock");
 productos[i].stock--;
-carrito.push({name:productos[i].name,precio:productos[i].precio,extras:[...extras]});
-extras=[];
-render();
+carrito.push(productos[i]);
+guardar();
+renderCarrito();
 }
 
-function render(){
-carritoDiv.innerHTML="";
-let t=0;
-carrito.forEach(c=>{
-let e=c.extras.reduce((a,x)=>a+x.p,0);
-t+=c.precio+e;
-const li=document.createElement("li");
-li.textContent=c.name+(c.extras.length?` (+${c.extras.map(x=>x.n).join(", ")})`:"");
-carritoDiv.appendChild(li);
+function renderCarrito(){
+carrito.innerHTML="";
+let total=0;
+carrito.forEach((p,i)=>{
+total+=p.precio;
+let li=document.createElement("li");
+li.innerHTML=`${p.name} $${p.precio} 
+<button onclick="eliminar(${i})">X</button>`;
+carrito.appendChild(li);
 });
-total.textContent=t;
-renderMenu();
+document.getElementById("total").textContent=total;
+}
+
+function eliminar(i){
+productos.find(p=>p.name===carrito[i].name).stock++;
+carrito.splice(i,1);
+guardar();
+renderCarrito();
 }
 
 function cobrar(){
-ventas.push(total.textContent);
-corte.textContent=ventas.reduce((a,v)=>a+Number(v),0);
-numVentas.textContent=ventas.length;
+if(!carrito.length) return;
+
+let total=Number(document.getElementById("total").textContent);
+
+let venta={
+ticket:ticketNum++,
+fecha:new Date().toLocaleString(),
+metodo:pago.value,
+usuario:rol,
+total:total
+};
+
+ventas.push(venta);
 carrito=[];
-render();
+guardar();
+renderCarrito();
+imprimir(venta);
 }
 
-function exportar(){
-let csv="Total\n"+ventas.join("\n");
-const a=document.createElement("a");
-a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-a.download="corte.csv";
-a.click();
+function imprimir(v){
+ticket.innerHTML=`
+<h3>Café Dos Raíces</h3>
+<p>Ticket #${v.ticket}</p>
+<p>${v.fecha}</p>
+<p>Cajero: ${v.usuario}</p>
+<p>Total: $${v.total}</p>
+<p>Método: ${v.metodo}</p>
+<hr>
+<p>Gracias por tu visita ☕</p>
+`;
+ticket.classList.remove("hidden");
+window.print();
+ticket.classList.add("hidden");
+}
+
+function filtrarFecha(){
+let fecha=document.getElementById("fechaFiltro").value;
+let filtro=ventas.filter(v=>v.fecha.startsWith(fecha));
+let total=filtro.reduce((a,v)=>a+v.total,0);
+corteDia.textContent=total;
+corteE.textContent=filtro.filter(v=>v.metodo==="Efectivo").reduce((a,v)=>a+v.total,0);
+corteT.textContent=filtro.filter(v=>v.metodo==="Transferencia").reduce((a,v)=>a+v.total,0);
+corteTar.textContent=filtro.filter(v=>v.metodo==="Tarjeta").reduce((a,v)=>a+v.total,0);
+}
+
+function renderInventario(){
+inventario.innerHTML="";
+productos.forEach((p,i)=>{
+inventario.innerHTML+=`
+<p>${p.name} - Stock: ${p.stock}
+<button onclick="reabastecer(${i})">+10</button>
+</p>`;
+});
+}
+
+function reabastecer(i){
+productos[i].stock+=10;
+guardar();
+renderMenu();
+}
+
+function resetSistema(){
+if(rol!=="Paco") return;
+if(confirm("¿Seguro que quieres reiniciar todo?")){
+localStorage.clear();
+location.reload();
+}
 }
 
 setInterval(()=>hora.textContent=new Date().toLocaleString(),1000);
 
-const loginDiv=document.getElementById("login");
-const app=document.getElementById("app");
-const admin=document.getElementById("admin");
-const menu=document.getElementById("menu");
-const carritoDiv=document.getElementById("carrito");
 </script>
 
 </body>
